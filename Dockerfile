@@ -12,8 +12,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy semua source code
 COPY . .
 
-# Expose port (FastAPI default kita pakai 8000)
 EXPOSE 9000
 
 # Run app pakai uvicorn
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "9000"]
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "9000"]
