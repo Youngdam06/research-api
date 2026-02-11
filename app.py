@@ -3,6 +3,7 @@ import requests
 from typing import List, Dict, Any
 import re
 from collections import Counter
+from fastapi import HTTPException
 STOPWORDS = {
     "the","of","and","in","for","on","with","to","a","an","by","from","at","as",
     "is","are","be","this","that","using","use","based","via","into","between",
@@ -13,6 +14,46 @@ STOPWORDS = {
 
 
 app = FastAPI(title="Research Metadata API", version="1.0.0")
+
+# --------- Helpers: Lookup paper by doi -----------
+def fetch_openalex_by_doi(doi: str):
+    # OpenAlex bisa search by DOI pakai filter
+    url = "https://api.openalex.org/works"
+    params = {
+        "filter": f"doi:{doi.lower()}"
+    }
+    headers = {
+        "User-Agent": "ResearchMetadataAPI/1.0 (mailto:fathoniadam933@gmail.com)"
+    }
+
+    r = requests.get(url, params=params, headers=headers, timeout=15)
+    r.raise_for_status()
+    data = r.json()
+
+    results = data.get("results", [])
+    if not results:
+        return None
+
+    return normalize_openalex(results[0])
+
+
+def fetch_crossref_by_doi(doi: str):
+    # CrossRef punya endpoint langsung by DOI
+    url = f"https://api.crossref.org/works/{doi}"
+    headers = {
+        "User-Agent": "ResearchMetadataAPI/1.0 (mailto:fathoniadam933@gmail.com)"
+    }
+
+    r = requests.get(url, headers=headers, timeout=15)
+    r.raise_for_status()
+    data = r.json()
+
+    item = data.get("message")
+    if not item:
+        return None
+
+    return normalize_crossref(item)
+
 
 # --------- Helpers: Trends ---------
 def extract_keywords(titles: List[str], top: int = 10):
@@ -133,7 +174,7 @@ def normalize_openalex(item: Dict[str, Any]) -> Dict[str, Any]:
         "authors": authors,
         "year": item.get("publication_year"),
         "doi": item.get("doi"),
-        "source": "openalex",
+        
     }
 
 
@@ -165,7 +206,7 @@ def normalize_crossref(item: Dict[str, Any]) -> Dict[str, Any]:
         "authors": authors,
         "year": year,
         "doi": doi,
-        "source": "crossref",
+        
     }
 
 
@@ -357,3 +398,35 @@ def trends(
         "trigrams": trigram_trends,
         "per_year": yearly
     }
+
+@app.get("/v1/papers/lookup")
+def lookup_paper(
+    doi: str = Query(..., description="DOI of the paper, e.g. 10.1000/xyz123")
+):
+    # Normalisasi DOI (hapus https://doi.org/ kalau user masukin itu)
+    doi_clean = doi.replace("https://doi.org/", "").strip()
+
+    # Coba dari OpenAlex dulu
+    try:
+        result = fetch_openalex_by_doi(doi_clean)
+        if result:
+            return {
+                "source": "openalex",
+                "paper": result
+            }
+    except Exception as e:
+        print("OpenAlex lookup error:", e)
+
+    # Kalau nggak ketemu / error, coba CrossRef
+    try:
+        result = fetch_crossref_by_doi(doi_clean)
+        if result:
+            return {
+                "source": "crossref",
+                "paper": result
+            }
+    except Exception as e:
+        print("CrossRef lookup error:", e)
+
+    # Kalau dua-duanya gagal
+    raise HTTPException(status_code=404, detail="Paper not found for given DOI")
