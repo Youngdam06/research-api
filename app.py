@@ -48,7 +48,7 @@ ERROR_INTERNAL = {
 app = FastAPI(title="Research Metadata API", version="1.0.0")
 
 # ===== Redis Server 
-REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_HOST = os.getenv("REDIS_HOST", "redis-cache")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 
 redis_client = redis.Redis(
