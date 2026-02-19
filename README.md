@@ -51,4 +51,4 @@ See RapidAPI pricing page for details.
 
 Access the full documentation and subscribe here:
 
-👉 https://rapidapi.com/your-username/research-api
+👉 [https://rapidapi.com/fathoniadam933/api/openresearch-api]
